@@ -13,11 +13,29 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getProctoringAnalysis } from '@/lib/actions';
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Video, VideoOff, AlertTriangle, ArrowLeft, ArrowRight, Camera } from 'lucide-react';
+import { Loader2, Video, AlertTriangle, ArrowLeft, ArrowRight, Camera } from 'lucide-react';
 import { useMediaRecorder } from '@/hooks/use-media-recorder';
 import { cn } from '@/lib/utils';
 
 type ExamState = 'idle' | 'permission' | 'active' | 'submitting' | 'error';
+
+// Type definition for FaceDetector, which might not be in default TS libs
+declare global {
+  interface Window {
+    FaceDetector: any;
+  }
+  class FaceDetector {
+    constructor(options?: any);
+    detect(image:
+      | HTMLImageElement
+      | HTMLVideoElement
+      | HTMLCanvasElement
+      | Blob
+      | ImageData
+      | VideoFrame
+    ): Promise<any[]>;
+  }
+}
 
 export default function ExamPage() {
   const router = useRouter();
@@ -27,17 +45,77 @@ export default function ExamPage() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>(() => Array(examQuestions.length).fill(null));
   const [hasCameraPermission, setHasCameraPermission] = useState(false);
+  const [isFaceDetectorSupported, setIsFaceDetectorSupported] = useState(true);
   
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const faceDetectorRef = useRef<FaceDetector | null>(null);
+  const animationFrameId = useRef<number>();
 
   const { status, startRecording, stopRecording, error: recorderError } = useMediaRecorder();
+  
+  const drawBoundingBox = (faces: any[]) => {
+    const canvas = canvasRef.current;
+    const video = videoRef.current;
+    if (!canvas || !video) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Match canvas dimensions to video
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = 'hsl(var(--accent))';
+    ctx.lineWidth = 4;
+    ctx.font = '16px Inter';
+    ctx.fillStyle = 'hsl(var(--accent))';
+
+    faces.forEach(face => {
+      const { x, y, width, height } = face.boundingBox;
+      ctx.beginPath();
+      ctx.rect(x, y, width, height);
+      ctx.stroke();
+      ctx.fillText('Candidate', x, y > 20 ? y - 5 : y + height + 15);
+    });
+  };
+
+  const detectFaces = async () => {
+    if (faceDetectorRef.current && videoRef.current && videoRef.current.readyState >= 2) {
+      try {
+        const faces = await faceDetectorRef.current.detect(videoRef.current);
+        drawBoundingBox(faces);
+      } catch (error) {
+        console.error('Face detection error:', error);
+      }
+    }
+    animationFrameId.current = requestAnimationFrame(detectFaces);
+  };
+
+
+  useEffect(() => {
+    if (status === 'recording' && isFaceDetectorSupported) {
+      animationFrameId.current = requestAnimationFrame(detectFaces);
+    }
+    return () => {
+      if (animationFrameId.current) {
+        cancelAnimationFrame(animationFrameId.current);
+      }
+    };
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, isFaceDetectorSupported]);
+  
 
   useEffect(() => {
     return () => {
       // Cleanup stream on component unmount
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      if (animationFrameId.current) {
+        cancelAnimationFrame(animationFrameId.current);
       }
     };
   }, []);
@@ -58,12 +136,20 @@ export default function ExamPage() {
   const handleStartExam = async () => {
     setExamState('permission');
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      if (!('FaceDetector' in window)) {
+        setIsFaceDetectorSupported(false);
+        console.warn('FaceDetector API is not supported in this browser.');
+      } else {
+        faceDetectorRef.current = new window.FaceDetector({ fastMode: true });
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: true });
       streamRef.current = stream;
       setHasCameraPermission(true);
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.play();
       }
       
       startRecording(stream);
@@ -95,7 +181,7 @@ export default function ExamPage() {
 
   const handlePrev = () => {
     if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
+      setCurrentQuestionIndex(currentQuestionIndex - 1); // Corrected from +1
     }
   };
 
@@ -104,7 +190,10 @@ export default function ExamPage() {
     
     const videoDataUri = await stopRecording();
     
-    // Stop camera stream after recording is finished
+    if (animationFrameId.current) {
+      cancelAnimationFrame(animationFrameId.current);
+    }
+    
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
     }
@@ -112,16 +201,13 @@ export default function ExamPage() {
         videoRef.current.srcObject = null;
     }
 
-
     if (!videoDataUri && hasCameraPermission) {
       toast({
         variant: "destructive",
         title: "Recording Error",
         description: "Could not retrieve the exam recording. Submission failed.",
       });
-      setExamState('active'); // Go back to active state if recording failed
-      // Attempt to restart camera if needed
-      handleStartExam();
+      setExamState('active');
       return;
     }
 
@@ -160,12 +246,24 @@ export default function ExamPage() {
           <Card className="w-64 shadow-lg">
             <CardHeader className="p-2 flex-row items-center gap-2">
               <Video className={cn("h-4 w-4", status === 'recording' ? 'text-destructive animate-pulse' : 'text-muted-foreground')} />
-              <CardTitle className="text-sm">{status === 'recording' ? 'Recording in Progress' : 'Camera Preview'}</CardTitle>
+              <CardTitle className="text-sm">
+                {status === 'recording' ? 'Recording in Progress' : 'Camera Preview'}
+              </CardTitle>
             </CardHeader>
-            <CardContent className="p-0">
+            <CardContent className="p-0 relative">
                <video ref={videoRef} className="w-full h-auto rounded-b-lg" autoPlay playsInline muted />
+               <canvas ref={canvasRef} className="absolute top-0 left-0 w-full h-full" />
             </CardContent>
           </Card>
+           {!isFaceDetectorSupported && (
+            <Alert variant="destructive" className="mt-2 text-xs">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Face Detection Not Supported</AlertTitle>
+              <AlertDescription>
+                Your browser doesn't support the Face Detector API. The bounding box will not be shown.
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
 
         <div className="max-w-4xl mx-auto">
@@ -176,14 +274,14 @@ export default function ExamPage() {
                 <CardDescription>Please read the instructions carefully before starting.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p>This is a proctored exam. Your session will be recorded via your webcam.</p>
+                <p>This is a proctored exam. Your session will be recorded via your webcam and audio.</p>
+                <p>A bounding box will appear around your face to ensure you are in the frame.</p>
                 <p>Ensure you are in a quiet, well-lit room with no one else present.</p>
-                <p>The entire session will be analyzed for any suspicious activity.</p>
                 <Alert>
                   <Camera className="h-4 w-4" />
-                  <AlertTitle>Camera Access Required</AlertTitle>
+                  <AlertTitle>Camera & Mic Access Required</AlertTitle>
                   <AlertDescription>
-                    We will need to access your camera to proctor the exam. Please grant permission when prompted.
+                    We will need to access your camera and microphone to proctor the exam. Please grant permission when prompted.
                   </AlertDescription>
                 </Alert>
               </CardContent>
@@ -207,7 +305,7 @@ export default function ExamPage() {
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>Error</AlertTitle>
                 <AlertDescription>
-                  Camera access was denied or another error occurred. Please refresh the page, grant camera permissions, and try again.
+                  Camera access was denied or another error occurred. Please refresh the page, grant permissions, and try again.
                 </AlertDescription>
             </Alert>
           )}
@@ -250,3 +348,5 @@ export default function ExamPage() {
     </>
   );
 }
+
+    
