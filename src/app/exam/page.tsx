@@ -19,6 +19,13 @@ import { cn } from '@/lib/utils';
 
 type ExamState = 'idle' | 'permission' | 'active' | 'submitting' | 'error';
 
+// Type guard for FaceDetector
+declare global {
+  interface window {
+    FaceDetector: any;
+  }
+}
+
 export default function ExamPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -29,14 +36,20 @@ export default function ExamPage() {
   const [hasCameraPermission, setHasCameraPermission] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const animationFrameId = useRef<number>();
 
   const { status, startRecording, stopRecording, error: recorderError } = useMediaRecorder();
   
   useEffect(() => {
+    // Cleanup function to stop camera and animation frame on component unmount
     return () => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      if (animationFrameId.current) {
+        cancelAnimationFrame(animationFrameId.current);
       }
     };
   }, []);
@@ -52,6 +65,35 @@ export default function ExamPage() {
     }
   }, [recorderError, toast]);
 
+  const detectFaces = async (faceDetector: any) => {
+    if (!videoRef.current || !canvasRef.current || videoRef.current.readyState < 2) {
+      animationFrameId.current = requestAnimationFrame(() => detectFaces(faceDetector));
+      return;
+    }
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    
+    if (ctx) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      const faces = await faceDetector.detect(video);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      faces.forEach((face: { boundingBox: { x: number; y: number; width: number; height: number; }; }) => {
+        ctx.strokeStyle = '#34D399'; // Green color for the box
+        ctx.lineWidth = 2;
+        const { x, y, width, height } = face.boundingBox;
+        ctx.strokeRect(x, y, width, height);
+      });
+    }
+
+    animationFrameId.current = requestAnimationFrame(() => detectFaces(faceDetector));
+  };
+
+
   const handleStartExam = async () => {
     setExamState('permission');
     try {
@@ -62,6 +104,15 @@ export default function ExamPage() {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.play().catch(console.error);
+      }
+
+      if ('FaceDetector' in window) {
+        const faceDetector = new (window as any).FaceDetector({ fastMode: true });
+        videoRef.current?.addEventListener('loadeddata', () => {
+           detectFaces(faceDetector);
+        });
+      } else {
+         console.warn("Face Detection API not supported in this browser.");
       }
       
       startRecording(stream);
@@ -100,6 +151,10 @@ export default function ExamPage() {
   const handleSubmit = async () => {
     setExamState('submitting');
     
+    if (animationFrameId.current) {
+      cancelAnimationFrame(animationFrameId.current);
+    }
+    
     const videoDataUri = await stopRecording();
     
     if (streamRef.current) {
@@ -119,7 +174,6 @@ export default function ExamPage() {
       return;
     }
 
-    // Fallback for when permissions are denied and there's no recording
     const finalVideoDataUri = hasCameraPermission ? videoDataUri || '' : '';
     const proctoringResult = await getProctoringAnalysis(finalVideoDataUri);
     
@@ -152,22 +206,23 @@ export default function ExamPage() {
     <>
       <Header />
       <main className="flex-1 container mx-auto px-4 py-8">
-        <div className="fixed top-20 right-4 z-10">
+         <div className="fixed top-20 right-4 z-10">
           <Card className="w-32 shadow-lg">
             <CardHeader className="p-2 flex-row items-center gap-2">
               <Video className={cn("h-4 w-4", status === 'recording' ? 'text-destructive animate-pulse' : 'text-muted-foreground')} />
               <CardTitle className="text-sm">
-                {status === 'recording' ? 'Recording...' : 'Camera Preview'}
+                {status === 'recording' ? 'Recording...' : 'Camera'}
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0 relative">
                <video ref={videoRef} className="w-full h-auto rounded-b-lg" autoPlay playsInline muted />
+               <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
                {examState === 'permission' && !hasCameraPermission && (
                 <div className="absolute inset-0 flex items-center justify-center bg-background/80">
                   <Loader2 className="h-6 w-6 animate-spin"/>
                 </div>
                )}
-               {!hasCameraPermission && examState !== 'active' && examState !== 'permission' && (
+               {examState !== 'active' && examState !== 'permission' && (
                 <div className="absolute inset-0 flex items-center justify-center bg-background/80">
                   <Camera className="h-8 w-8 text-muted-foreground" />
                 </div>
