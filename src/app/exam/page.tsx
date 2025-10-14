@@ -13,7 +13,8 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getProctoringAnalysis } from '@/lib/actions';
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Video, VideoOff, AlertTriangle, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Loader2, Video, VideoOff, AlertTriangle, ArrowLeft, ArrowRight, Camera } from 'lucide-react';
+import { useMediaRecorder } from '@/hooks/use-media-recorder';
 
 type ExamState = 'idle' | 'permission' | 'active' | 'submitting' | 'error';
 
@@ -24,10 +25,41 @@ export default function ExamPage() {
   const [examState, setExamState] = useState<ExamState>('idle');
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>(() => Array(examQuestions.length).fill(null));
+  const [hasCameraPermission, setHasCameraPermission] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const { status, error: recorderError, requestPermissionAndStart, stopRecording } = useMediaRecorder(videoRef);
 
-  const handleStartExam = () => {
-    // Since we are not using the camera, we can go directly to the active state.
-    setExamState('active');
+  useEffect(() => {
+    if (recorderError) {
+      setExamState('error');
+      toast({
+        variant: "destructive",
+        title: "Camera Error",
+        description: recorderError.message,
+      });
+    }
+  }, [recorderError, toast]);
+
+  useEffect(() => {
+    if (status === 'recording') {
+      setHasCameraPermission(true);
+      setExamState('active');
+    }
+     if (status === 'error') {
+      setHasCameraPermission(false);
+      setExamState('idle'); // or an error state
+      toast({
+          variant: 'destructive',
+          title: 'Camera Access Denied',
+          description: 'Please enable camera permissions in your browser settings to start the exam.',
+        });
+    }
+  }, [status, toast]);
+
+
+  const handleStartExam = async () => {
+    setExamState('permission');
+    await requestPermissionAndStart();
   };
 
   const handleAnswerSelect = (optionIndex: number) => {
@@ -50,8 +82,8 @@ export default function ExamPage() {
 
   const handleSubmit = async () => {
     setExamState('submitting');
-    // Using a dummy data URI for the video as requested.
-    const videoDataUri = 'data:video/webm;base64,';
+    
+    const videoDataUri = await stopRecording();
 
     if (!videoDataUri) {
       toast({
@@ -102,9 +134,16 @@ export default function ExamPage() {
                 <CardDescription>Please read the instructions carefully before starting.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p>This is a proctored exam. Your session will be recorded.</p>
+                <p>This is a proctored exam. Your session will be recorded via your webcam.</p>
                 <p>Ensure you are in a quiet, well-lit room with no one else present.</p>
                 <p>The entire session will be analyzed for any suspicious activity.</p>
+                <Alert>
+                  <Camera className="h-4 w-4" />
+                  <AlertTitle>Camera Access Required</AlertTitle>
+                  <AlertDescription>
+                    We will need to access your camera to proctor the exam. Please grant permission when prompted.
+                  </AlertDescription>
+                </Alert>
               </CardContent>
               <CardFooter>
                 <Button size="lg" onClick={handleStartExam}>Start Exam</Button>
@@ -116,7 +155,7 @@ export default function ExamPage() {
             <div className="flex flex-col items-center justify-center h-96">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
                 <p className="mt-4 text-lg">
-                  {examState === 'permission' ? 'Starting exam...' : 'Submitting and analyzing...'}
+                  {examState === 'permission' ? 'Requesting camera access...' : 'Submitting and analyzing...'}
                 </p>
             </div>
           )}
@@ -126,7 +165,7 @@ export default function ExamPage() {
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>Error</AlertTitle>
                 <AlertDescription>
-                  An unexpected error occurred. Please refresh the page and try again.
+                  {recorderError?.message || 'An unexpected error occurred. Please refresh the page and try again.'}
                 </AlertDescription>
             </Alert>
           )}
@@ -140,7 +179,7 @@ export default function ExamPage() {
                     <CardTitle className="text-sm">Recording in Progress</CardTitle>
                   </CardHeader>
                   <CardContent className="p-0">
-                    <video src="https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4" autoPlay playsInline muted loop className="w-full h-auto rounded-b-lg" />
+                     <video ref={videoRef} className="w-full h-auto rounded-b-lg" autoPlay playsInline muted />
                   </CardContent>
                 </Card>
               </div>
@@ -170,7 +209,7 @@ export default function ExamPage() {
                       Next <ArrowRight className="ml-2" />
                     </Button>
                   ) : (
-                    <Button onClick={handleSubmit} variant="accent">Submit Exam</Button>
+                    <Button onClick={handleSubmit} variant="destructive">Submit Exam</Button>
                   )}
                 </CardFooter>
               </Card>
