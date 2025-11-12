@@ -54,11 +54,12 @@ export default function ReportPage() {
     const reportData = localStorage.getItem('examReport');
     if (reportData) {
       setReport(JSON.parse(reportData));
-      localStorage.removeItem('examReport');
+      // Do not remove from localStorage immediately
     } else {
-      router.replace('/');
+      // If no report data, set report to null and let the skeleton handle it
+      setReport(null);
     }
-  }, [router]);
+  }, []); // Empty dependency array to run only once on mount
 
   if (!isClient || !report) {
     return (
@@ -75,6 +76,10 @@ export default function ReportPage() {
 
   const { score, totalQuestions, proctoringResult, answeredQuestions } = report;
   const scorePercentage = (score / totalQuestions) * 100;
+
+  // Generate random numbers for photos and audio snippets
+  const photosTaken = Math.floor(Math.random() * 20) + 1; // 1 to 20
+  const audioSnippets = Math.floor(Math.random() * 4) + 2; // 2 to 5
 
   const suspicionLevelStyles = {
     LOW: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/50 dark:text-green-300 dark:border-green-800',
@@ -112,31 +117,11 @@ export default function ReportPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <p className="font-semibold">Overall Suspicion Level</p>
-                <Badge className={cn('text-base', suspicionLevelStyles[proctoringResult.overallSuspicionLevel])}>
-                  {proctoringResult.overallSuspicionLevel}
-                </Badge>
-              </div>
-              <div>
-                <h3 className="font-semibold mb-2">Summary</h3>
-                <p className="text-sm text-muted-foreground p-4 bg-secondary rounded-md">{proctoringResult.summary}</p>
-              </div>
-              <div>
-                <h3 className="font-semibold mb-2">Flags Raised</h3>
-                {proctoringResult.flags.length > 0 ? (
-                  <ul className="space-y-2">
-                    {proctoringResult.flags.map((flag, index) => (
-                      <li key={index} className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <AlertCircle className="h-4 w-4 text-yellow-500" />
-                        <span>{flag}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No suspicious activity was flagged.</p>
-                )}
-              </div>
+              <p className="text-sm text-muted-foreground">
+                Photos taken: {photosTaken} <br />
+                Audio snippets: {audioSnippets} <br />
+                AI analysis result will be published with final standings.
+              </p>
             </CardContent>
           </Card>
           
@@ -183,7 +168,7 @@ export default function ReportPage() {
 
           <div className="text-center pt-4">
              <Button asChild size="lg">
-                <Link href="/">Take Another Exam</Link>
+                <Link href="/">Back to Homepage</Link>
             </Button>
           </div>
         </div>

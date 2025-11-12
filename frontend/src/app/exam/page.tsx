@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { examQuestions } from '@/lib/questions';
 import type { Question, ExamReport } from '@/lib/types';
@@ -13,12 +13,14 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getProctoringAnalysis } from '@/lib/actions';
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Video, ArrowLeft, ArrowRight, Camera } from 'lucide-react';
+import { Loader2, Video, ArrowLeft, ArrowRight, Camera, TimerIcon } from 'lucide-react';
 import { useMediaRecorder } from '@/hooks/use-media-recorder';
 import { cn } from '@/lib/utils';
 import Draggable from 'react-draggable';
 
 type ExamState = 'idle' | 'permission' | 'active' | 'submitting' | 'error';
+
+const EXAM_TIME_LIMIT = 25 * 60; // 25 minutes in seconds
 
 export default function ExamPage() {
   const router = useRouter();
@@ -28,11 +30,74 @@ export default function ExamPage() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>(() => Array(examQuestions.length).fill(null));
   const [hasCameraPermission, setHasCameraPermission] = useState(false);
+  const [remainingTime, setRemainingTime] = useState(EXAM_TIME_LIMIT);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const draggableRef = useRef<HTMLDivElement>(null);
   const { status, startRecording, stopRecording, error: recorderError } = useMediaRecorder();
   
+  const handleSubmit = useCallback(async () => {
+    setExamState('submitting');
+        
+    const videoDataUri = await stopRecording();
+    
+    if (videoRef.current && videoRef.current.srcObject) {
+        const stream = videoRef.current.srcObject as MediaStream;
+        stream.getTracks().forEach(track => track.stop());
+        videoRef.current.srcObject = null;
+    }
+
+    if (!videoDataUri && hasCameraPermission) {
+      toast({
+        variant: "destructive",
+        title: "Recording Error",
+        description: "Could not retrieve the exam recording. Submission failed.",
+      });
+      setExamState('active');
+      return;
+    }
+
+    const finalVideoDataUri = hasCameraPermission ? videoDataUri || '' : '';
+    const proctoringResult = await getProctoringAnalysis(finalVideoDataUri);
+    
+    let score = 0;
+    const answeredQuestions = examQuestions.map((q, index) => {
+      const isCorrect = answers[index] === q.correctAnswer;
+      if (isCorrect) score++;
+      return {
+        question: q,
+        selectedAnswer: answers[index],
+        isCorrect,
+      };
+    });
+
+    const report: ExamReport = {
+      score,
+      totalQuestions: examQuestions.length,
+      proctoringResult,
+      answeredQuestions,
+    };
+    
+    localStorage.setItem('examReport', JSON.stringify(report));
+    router.push('/report');
+  }, [answers, hasCameraPermission, router, stopRecording, toast]);
+
+  useEffect(() => {
+    if (examState === 'active') {
+      const timer = setInterval(() => {
+        setRemainingTime(prevTime => {
+          if (prevTime <= 1) {
+            clearInterval(timer);
+            handleSubmit();
+            return 0;
+          }
+          return prevTime - 1;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [examState, handleSubmit]);
+
   useEffect(() => {
     // Cleanup function to stop camera on component unmount
     return () => {
@@ -96,55 +161,14 @@ export default function ExamPage() {
       setCurrentQuestionIndex(currentQuestionIndex - 1);
     }
   };
-
-  const handleSubmit = async () => {
-    setExamState('submitting');
-        
-    const videoDataUri = await stopRecording();
-    
-    if (videoRef.current && videoRef.current.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream;
-        stream.getTracks().forEach(track => track.stop());
-        videoRef.current.srcObject = null;
-    }
-
-    if (!videoDataUri && hasCameraPermission) {
-      toast({
-        variant: "destructive",
-        title: "Recording Error",
-        description: "Could not retrieve the exam recording. Submission failed.",
-      });
-      setExamState('active');
-      return;
-    }
-
-    const finalVideoDataUri = hasCameraPermission ? videoDataUri || '' : '';
-    const proctoringResult = await getProctoringAnalysis(finalVideoDataUri);
-    
-    let score = 0;
-    const answeredQuestions = examQuestions.map((q, index) => {
-      const isCorrect = answers[index] === q.correctAnswer;
-      if (isCorrect) score++;
-      return {
-        question: q,
-        selectedAnswer: answers[index],
-        isCorrect,
-      };
-    });
-
-    const report: ExamReport = {
-      score,
-      totalQuestions: examQuestions.length,
-      proctoringResult,
-      answeredQuestions,
-    };
-    
-    localStorage.setItem('examReport', JSON.stringify(report));
-    router.push('/report');
-  };
   
   const currentQuestion = examQuestions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / examQuestions.length) * 100;
+  const formatTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   return (
     <>
@@ -185,19 +209,43 @@ export default function ExamPage() {
                 <CardDescription>Please read the instructions carefully before starting.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p>This is a proctored exam. Your session will be recorded via your webcam and audio.</p>
-                <p>Ensure you are in a quiet, well-lit room with no one else present.</p>
+                <p>This is a closed-book, multiple-choice assessment designed to test your core understanding.</p>
+                <p>To protect the integrity of your results and ensure a level playing field for everyone, this assessment uses secure, AI-powered proctoring.</p>
+                
+                <h3 className="font-semibold">How Proctoring Ensures Fairness:</h3>
+                <ul className="list-disc list-inside text-sm text-muted-foreground">
+                  <li><strong>Camera Access (Visual Security):</strong> Your webcam will take still pictures at randomized intervals. These images are used solely to verify your identity and ensure no unauthorized resources or individuals are present.</li>
+                  <li><strong>Microphone Access (Audio Security):</strong> Your microphone will record short audio snippets throughout the exam. This is used to detect unusual noises or conversations that may indicate unauthorized assistance.</li>
+                </ul>
+
+                <h3 className="font-semibold">Data Policy:</h3>
+                <p className="text-sm text-muted-foreground">All collected data is stored securely and reviewed <strong>only if the AI flags suspicious activity</strong>. If no flags are raised, the data is automatically discarded after the review period. By proceeding, you agree to this monitoring.</p>
+
                 <Alert variant={examState === 'error' ? 'destructive' : 'default'}>
                   <Camera className="h-4 w-4" />
                   <AlertTitle>Camera & Mic Access Required</AlertTitle>
                   <AlertDescription>
-                    We will need to access your camera and microphone to proctor the exam. Please grant permission when prompted to start. If you deny permission, the exam cannot proceed.
+                    Access is required for your device's camera and microphone before the exam can begin.
                   </AlertDescription>
                 </Alert>
               </CardContent>
               <CardFooter>
-                <Button size="lg" onClick={handleStartExam}>
-                  {examState === 'error' ? 'Retry Camera Access' : 'Start Exam'}
+                <Button 
+                  size="lg" 
+                  onClick={handleStartExam}
+                  style={{
+                    padding: '12px 24px',
+                    fontSize: '1.1em',
+                    fontWeight: 'bold',
+                    backgroundColor: '#059669',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    marginTop: '20px',
+                  }}
+                >
+                  {examState === 'error' ? 'Retry Camera Access' : 'START SECURE EXAM'}
                 </Button>
               </CardFooter>
             </Card>
@@ -221,14 +269,20 @@ export default function ExamPage() {
 
           {examState === 'active' && (
             <div>
-              <Progress value={progress} className="mb-4" />
+              <div className="flex justify-between items-center mb-4">
+                <Progress value={progress} className="w-full mr-4" />
+                <div className="flex items-center gap-2 text-lg font-semibold">
+                  <TimerIcon className="h-6 w-6" />
+                  <span>{formatTime(remainingTime)}</span>
+                </div>
+              </div>
               <Card className="transition-all duration-300">
                 <CardHeader>
                   <CardTitle className="text-xl font-headline">Question {currentQuestionIndex + 1} of {examQuestions.length}</CardTitle>
                   <CardDescription className="text-lg pt-2">{currentQuestion.question}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <RadioGroup value={answers[currentQuestionIndex]?.toString()} onValueChange={(val) => handleAnswerSelect(parseInt(val))}>
+                  <RadioGroup value={answers[currentQuestionIndex] !== null ? answers[currentQuestionIndex].toString() : ''} onValueChange={(val) => handleAnswerSelect(parseInt(val))}>
                     {currentQuestion.options.map((option, index) => (
                       <div key={index} className="flex items-center space-x-2 p-3 rounded-md hover:bg-secondary transition-colors">
                         <RadioGroupItem value={index.toString()} id={`option-${index}`} />
@@ -246,7 +300,7 @@ export default function ExamPage() {
                       Next <ArrowRight className="ml-2" />
                     </Button>
                   ) : (
-                    <Button onClick={handleSubmit} variant="destructive">Submit Exam</Button>
+                    <Button onClick={() => handleSubmit()} variant="destructive">Submit Exam</Button>
                   )}
                 </CardFooter>
               </Card>
