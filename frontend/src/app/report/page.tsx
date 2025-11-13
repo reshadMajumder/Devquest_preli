@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ExamReport } from '@/lib/types';
-import { Header } from '@/components/layout/Header';
+import  Header  from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -134,34 +134,39 @@ export default function ReportPage() {
             </CardHeader>
             <CardContent>
                 <Accordion type="single" collapsible className="w-full">
-                    {answeredQuestions.map(({ question, selectedAnswer, isCorrect }, index) => (
-                        <AccordionItem value={`item-${index}`} key={question.id}>
-                            <AccordionTrigger className={cn("text-left", isCorrect ? 'text-foreground' : 'text-destructive')}>
-                                <div className="flex items-center gap-2">
-                                    {isCorrect ? <CheckCircle className="h-5 w-5 text-green-500" /> : <XCircle className="h-5 w-5 text-destructive" />}
-                                    <span>Question {index + 1}: {isCorrect ? 'Correct' : 'Incorrect'}</span>
-                                </div>
-                            </AccordionTrigger>
-                            <AccordionContent className="space-y-4">
-                                <p className="font-semibold">{question.question}</p>
-                                <ul className="space-y-2 text-sm">
-                                    {question.options.map((option, optIndex) => (
-                                        <li key={optIndex} className={cn(
-                                            "flex items-center gap-2 border p-2 rounded-md",
-                                            optIndex === question.correctAnswer ? 'border-green-500 bg-green-500/10' : '',
-                                            optIndex === selectedAnswer && !isCorrect ? 'border-destructive bg-red-500/10' : ''
-                                        )}>
-                                            {optIndex === question.correctAnswer && <CheckCircle className="h-4 w-4 text-green-500" />}
-                                            {optIndex === selectedAnswer && optIndex !== question.correctAnswer && <XCircle className="h-4 w-4 text-destructive" />}
-                                            <span>{option}</span>
-                                            {optIndex === selectedAnswer && <Badge variant="outline">Your Answer</Badge>}
-                                            {optIndex === question.correctAnswer && <Badge variant="outline" className="border-green-500 text-green-600">Correct Answer</Badge>}
-                                        </li>
-                                    ))}
-                                </ul>
-                            </AccordionContent>
-                        </AccordionItem>
-                    ))}
+                    {answeredQuestions.map(({ question, selectedAnswer, isCorrect }, index) => {
+                        const optionsArray = typeof question.options === 'string'
+                            ? JSON.parse(question.options)
+                            : question.options;
+                        return (
+                            <AccordionItem value={`item-${index}`} key={question.id}>
+                                <AccordionTrigger className={cn("text-left", isCorrect ? 'text-foreground' : 'text-destructive')}>
+                                    <div className="flex items-center gap-2">
+                                        {isCorrect ? <CheckCircle className="h-5 w-5 text-green-500" /> : <XCircle className="h-5 w-5 text-destructive" />}
+                                        <span>Question {index + 1}: {isCorrect ? 'Correct' : 'Incorrect'}</span>
+                                    </div>
+                                </AccordionTrigger>
+                                <AccordionContent className="space-y-4">
+                                    <p className="font-semibold">{question.question}</p>
+                                    <ul className="space-y-2 text-sm">
+                                        {optionsArray?.map((option, optIndex) => (
+                                            <li key={optIndex} className={cn(
+                                                "flex items-center gap-2 border p-2 rounded-md",
+                                                optIndex === question.correctAnswer ? 'border-green-500 bg-green-500/10' : '',
+                                                optIndex === selectedAnswer && !isCorrect ? 'border-destructive bg-red-500/10' : ''
+                                            )}>
+                                                {optIndex === question.correctAnswer && <CheckCircle className="h-4 w-4 text-green-500" />}
+                                                {optIndex === selectedAnswer && optIndex !== question.correctAnswer && <XCircle className="h-4 w-4 text-destructive" />}
+                                                <span>{option}</span>
+                                                {optIndex === selectedAnswer && <Badge variant="outline">Your Answer</Badge>}
+                                                {optIndex === question.correctAnswer && <Badge variant="outline" className="border-green-500 text-green-600">Correct Answer</Badge>}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </AccordionContent>
+                            </AccordionItem>
+                        );
+                    })}
                 </Accordion>
             </CardContent>
           </Card>

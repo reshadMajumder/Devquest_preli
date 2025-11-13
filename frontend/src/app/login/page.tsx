@@ -8,9 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Header } from '@/components/layout/Header';
+import Header from '@/components/layout/Header'; // Add Header import
 import { useToast } from "@/hooks/use-toast";
 import { authApi } from '@/lib/api'; // Import authApi
+import { Eye, EyeOff } from 'lucide-react';
 
 const GoogleIcon = () => (
   <svg className="mr-2 h-4 w-4" viewBox="0 0 48 48">
@@ -24,8 +25,10 @@ const GoogleIcon = () => (
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [studentId, setStudentId] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
 
@@ -54,12 +57,13 @@ export default function LoginPage() {
 
     const response = await authApi.login({ email, password });
 
-    if (response.success) {
-      localStorage.setItem('access_token', response.access || '');
-      localStorage.setItem('refresh_token', response.refresh || '');
+    if (response.success && response.data) {
+      localStorage.setItem('access_token', response.data.access || '');
+      localStorage.setItem('refresh_token', response.data.refresh || '');
       toast({
+        variant: "success",
         title: "Login Successful",
-        description: response.message,
+        description: response.data.message,
       });
       router.push('/exam'); // Redirect to exam page after successful login
     } else {
@@ -75,12 +79,13 @@ export default function LoginPage() {
     e.preventDefault();
     if (!validateEmail(email)) return;
 
-    const response = await authApi.register({ email, first_name: firstName, last_name: lastName, password, password2: password });
+    const response = await authApi.register({ email, full_name: fullName, whatsapp_number: whatsappNumber, student_id: studentId, password, password2: password });
 
-    if (response.success) {
+    if (response.success && response.data) {
       toast({
+        variant: "success",
         title: "Registration Successful",
-        description: response.message + " Please verify your email with the OTP.",
+        description: response.data.message + " Please verify your email with the OTP.",
       });
       router.push(`/verify-otp?email=${encodeURIComponent(email)}`); 
     } else {
@@ -117,7 +122,12 @@ export default function LoginPage() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="login-password">Password</Label>
-                    <Input id="login-password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+                    <div className="relative">
+                      <Input id="login-password" type={showPassword ? "text" : "password"} required value={password} onChange={(e) => setPassword(e.target.value)} />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 flex items-center px-3">
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </div>
                   <div className="flex justify-end text-sm">
                     <Link href="/forgot-password" className="text-primary hover:underline">Forgot Password?</Link>
@@ -152,12 +162,16 @@ export default function LoginPage() {
               <CardContent className="space-y-4">
                 <form onSubmit={handleRegister} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="register-first-name">First Name</Label>
-                    <Input id="register-first-name" type="text" placeholder="John" required value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+                    <Label htmlFor="register-full-name">Full Name</Label>
+                    <Input id="register-full-name" type="text" placeholder="John Doe" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="register-last-name">Last Name</Label>
-                    <Input id="register-last-name" type="text" placeholder="Doe" required value={lastName} onChange={(e) => setLastName(e.target.value)} />
+                    <Label htmlFor="register-whatsapp-number">WhatsApp Number</Label>
+                    <Input id="register-whatsapp-number" type="text" placeholder="e.g., +8801XXXXXXXXX" required value={whatsappNumber} onChange={(e) => setWhatsappNumber(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="register-student-id">Student ID</Label>
+                    <Input id="register-student-id" type="text" placeholder="e.g., 202XXXXXXX" required value={studentId} onChange={(e) => setStudentId(e.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="register-email">Email</Label>
@@ -165,24 +179,15 @@ export default function LoginPage() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="register-password">Password</Label>
-                    <Input id="register-password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+                    <div className="relative">
+                      <Input id="register-password" type={showPassword ? "text" : "password"} required value={password} onChange={(e) => setPassword(e.target.value)} />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 flex items-center px-3">
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </div>
                   <Button type="submit" className="w-full text-white bg-[#30475f] hover:bg-[#006298] shadow-sm hover:shadow-md transition-all duration-300">Create Account</Button>
                 </form>
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">
-                      Or continue with
-                    </span>
-                  </div>
-                </div>
-                <Button variant="outline" className="w-full" onClick={handleGoogleLogin}>
-                  <GoogleIcon />
-                  Sign up with Google
-                </Button>
               </CardContent>
             </Card>
           </TabsContent>

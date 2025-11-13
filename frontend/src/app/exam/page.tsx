@@ -2,9 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { examQuestions } from '@/lib/questions';
-import type { Question, ExamReport } from '@/lib/types';
-import { Header } from '@/components/layout/Header';
+import Header from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -13,10 +11,39 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getProctoringAnalysis } from '@/lib/actions';
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Video, ArrowLeft, ArrowRight, Camera, TimerIcon } from 'lucide-react';
+import { Loader2, Video, ArrowLeft, ArrowRight, Camera, TimerIcon, LogOut } from 'lucide-react';
 import { useMediaRecorder } from '@/hooks/use-media-recorder';
 import { cn } from '@/lib/utils';
 import Draggable from 'react-draggable';
+
+import { authApi, examApi } from '@/lib/api'; // Import authApi and examApi
+
+// Define types for API response
+interface Question {
+  id: number;
+  text: string;
+  options: string; // It's a JSON string from the backend
+}
+
+interface ReportQuestion {
+    id: number;
+    question: string;
+    options: string;
+    correctAnswer: number;
+}
+
+interface AnsweredQuestion {
+    question: ReportQuestion;
+    selectedAnswer: number | null;
+    isCorrect: boolean;
+}
+
+interface ExamReport {
+  score: number;
+  totalQuestions: number;
+  proctoringResult: any;
+  answeredQuestions: AnsweredQuestion[];
+}
 
 type ExamState = 'idle' | 'permission' | 'active' | 'submitting' | 'error';
 
@@ -28,7 +55,68 @@ export default function ExamPage() {
   
   const [examState, setExamState] = useState<ExamState>('idle');
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [answers, setAnswers] = useState<(number | null)[]>(() => Array(examQuestions.length).fill(null));
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [questions, setQuestions] = useState<Question[]>([]); // State to store fetched questions
+  const [loadingQuestions, setLoadingQuestions] = useState(true); // Loading state for questions
+
+  useEffect(() => {
+    const checkLoginStatus = () => {
+      const accessToken = localStorage.getItem('access_token');
+      setIsLoggedIn(!!accessToken);
+
+      if (!accessToken) {
+        // If not logged in, redirect to login
+        router.push('/login');
+      }
+    };
+
+    checkLoginStatus();
+
+    window.addEventListener('storage', checkLoginStatus);
+    return () => {
+      window.removeEventListener('storage', checkLoginStatus);
+    };
+  }, [router]);
+
+  const handleSessionExpiration = useCallback(() => {
+    toast({
+        variant: "destructive",
+        title: "Session Expired",
+        description: "Your session has expired. Please log in again.",
+    });
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    setIsLoggedIn(false);
+    router.push('/login');
+  }, [toast, router]);
+
+  const handleLogout = async () => {
+    const refreshToken = localStorage.getItem('refresh_token');
+    if (refreshToken) {
+      const response = await authApi.logout({ refresh_token: refreshToken });
+      if (response.success) {
+        toast({
+          title: "Logout Successful",
+          description: response.message,
+        });
+      } else {
+        if (response.error === 'Authentication required.') {
+            handleSessionExpiration();
+            return;
+        }
+        toast({
+          variant: "destructive",
+          title: "Logout Failed",
+          description: response.error,
+        });
+      }
+    }
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    setIsLoggedIn(false);
+    router.push('/login'); // Redirect to login page after logout
+  };
+  const [answers, setAnswers] = useState<(number | null)[]>([]); // Changed initial state to empty array
   const [hasCameraPermission, setHasCameraPermission] = useState(false);
   const [remainingTime, setRemainingTime] = useState(EXAM_TIME_LIMIT);
   
@@ -60,27 +148,50 @@ export default function ExamPage() {
     const finalVideoDataUri = hasCameraPermission ? videoDataUri || '' : '';
     const proctoringResult = await getProctoringAnalysis(finalVideoDataUri);
     
-    let score = 0;
-    const answeredQuestions = examQuestions.map((q, index) => {
-      const isCorrect = answers[index] === q.correctAnswer;
-      if (isCorrect) score++;
-      return {
-        question: q,
-        selectedAnswer: answers[index],
-        isCorrect,
-      };
-    });
+    // Prepare answers for API submission
+    const answersToSubmit = questions.map((q, index) => ({
+      question_id: q.id,
+      selected_option_index: answers[index],
+    }));
 
-    const report: ExamReport = {
-      score,
-      totalQuestions: examQuestions.length,
-      proctoringResult,
-      answeredQuestions,
-    };
-    
-    localStorage.setItem('examReport', JSON.stringify(report));
-    router.push('/report');
-  }, [answers, hasCameraPermission, router, stopRecording, toast]);
+    try {
+      const submissionResponse = await examApi.submitExamAnswers({ answers: answersToSubmit });
+
+      if (submissionResponse.success) {
+        const report: ExamReport = {
+          score: submissionResponse.data.score,
+          totalQuestions: submissionResponse.data.totalQuestions,
+          proctoringResult,
+          answeredQuestions: submissionResponse.data.answeredQuestions,
+        };
+        localStorage.setItem('examReport', JSON.stringify(report));
+        toast({
+          variant: "success",
+          title: "Exam Submitted",
+          description: "Your exam has been submitted successfully.",
+        });
+        router.push('/report');
+      } else {
+        if (submissionResponse.error === 'Authentication required.') {
+            handleSessionExpiration();
+            return;
+        }
+        toast({
+          variant: "destructive",
+          title: "Submission Failed",
+          description: submissionResponse.error || "An unknown error occurred during submission.",
+        });
+        setExamState('active');
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Submission Error",
+        description: error.message || "Network error during submission.",
+      });
+      setExamState('active');
+    }
+  }, [answers, hasCameraPermission, questions, router, stopRecording, toast, handleSessionExpiration]);
 
   useEffect(() => {
     if (examState === 'active') {
@@ -120,6 +231,32 @@ export default function ExamPage() {
   }, [recorderError, toast]);
 
   const handleStartExam = async () => {
+    // First, check if the user has already attempted the exam
+    const userDetailsResponse = await authApi.getUserDetails();
+
+    if (userDetailsResponse.success && userDetailsResponse.data) {
+      if (userDetailsResponse.data.exam_attempted) {
+        toast({
+          variant: "destructive",
+          title: "Exam Already Attempted",
+          description: "You have no attempts left.",
+        });
+        return;
+      }
+    } else {
+      // Handle error while fetching user details
+      if (userDetailsResponse.error === 'Authentication required.') {
+        handleSessionExpiration();
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Could not verify exam status. Please try again.",
+        });
+      }
+      return;
+    }
+
     setExamState('permission');
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: true });
@@ -130,10 +267,44 @@ export default function ExamPage() {
       }
       
       startRecording(stream);
-      setExamState('active');
+      
+      // Fetch questions after camera access is granted
+      setLoadingQuestions(true);
+      try {
+        const response = await examApi.getExamQuestions();
+        
+        if (response.success && Array.isArray(response.data)) {
 
-    } catch (err) {
-      console.error("Camera access error:", err);
+          setQuestions(response.data);
+          setAnswers(Array(response.data.length).fill(null));
+          setExamState('active');
+        } else {
+
+          if (response.error === 'Authentication required.') {
+            handleSessionExpiration();
+          } else {
+            toast({
+              variant: "destructive",
+              title: "Failed to load questions",
+              description: response.error || "An unknown error occurred.",
+            });
+            setExamState('error');
+          }
+        }
+      } catch (error: any) {
+  
+        toast({
+            variant: "destructive",
+            title: "Failed to load questions",
+            description: error.message || "An unknown error occurred.",
+        });
+        setExamState('error');
+      } finally {
+        setLoadingQuestions(false);
+      }
+
+    } catch (err: any) {
+
       setExamState('error');
       setHasCameraPermission(false);
       toast({
@@ -151,7 +322,7 @@ export default function ExamPage() {
   };
 
   const handleNext = () => {
-    if (currentQuestionIndex < examQuestions.length - 1) {
+    if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     }
   };
@@ -162,18 +333,32 @@ export default function ExamPage() {
     }
   };
   
-  const currentQuestion = examQuestions[currentQuestionIndex];
-  const progress = ((currentQuestionIndex + 1) / examQuestions.length) * 100;
+  const currentQuestion = questions[currentQuestionIndex];
+  const progress = questions.length > 0 ? ((currentQuestionIndex + 1) / questions.length) * 100 : 0;
   const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // New variable for parsing options
+  const optionsArray = typeof currentQuestion?.options === 'string'
+    ? JSON.parse(currentQuestion.options)
+    : currentQuestion?.options;
+
   return (
     <>
       <Header />
       <main className="flex-1 container mx-auto px-4 py-8">
+        {isLoggedIn && (
+          <div className="flex justify-end mb-4">
+            {/* The logout button here is redundant as Header already has it */}
+            {/* <Button onClick={handleLogout} className="text-white bg-[#30475f] hover:bg-[#2a3f55] shadow-sm hover:shadow-md transition-all duration-300">
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
+            </Button> */}
+          </div>
+        )}
         <Draggable nodeRef={draggableRef}>
           <div ref={draggableRef} className="fixed top-20 right-4 z-10 cursor-move">
             <Card className="w-32 shadow-lg">
@@ -269,6 +454,8 @@ export default function ExamPage() {
 
           {examState === 'active' && (
             <div>
+
+
               <div className="flex justify-between items-center mb-4">
                 <Progress value={progress} className="w-full mr-4" />
                 <div className="flex items-center gap-2 text-lg font-semibold">
@@ -278,12 +465,13 @@ export default function ExamPage() {
               </div>
               <Card className="transition-all duration-300">
                 <CardHeader>
-                  <CardTitle className="text-xl font-headline">Question {currentQuestionIndex + 1} of {examQuestions.length}</CardTitle>
-                  <CardDescription className="text-lg pt-2">{currentQuestion.question}</CardDescription>
+                  <CardTitle className="text-xl font-headline">Question {currentQuestionIndex + 1} of {questions.length}</CardTitle>
+                  <CardDescription className="text-lg pt-2">{currentQuestion?.text}</CardDescription>
                 </CardHeader>
                 <CardContent>
+
                   <RadioGroup value={answers[currentQuestionIndex] !== null ? answers[currentQuestionIndex].toString() : ''} onValueChange={(val) => handleAnswerSelect(parseInt(val))}>
-                    {currentQuestion.options.map((option, index) => (
+                    {optionsArray?.map((option, index) => (
                       <div key={index} className="flex items-center space-x-2 p-3 rounded-md hover:bg-secondary transition-colors">
                         <RadioGroupItem value={index.toString()} id={`option-${index}`} />
                         <Label htmlFor={`option-${index}`} className="text-base flex-1 cursor-pointer">{option}</Label>
@@ -295,7 +483,7 @@ export default function ExamPage() {
                   <Button variant="outline" onClick={handlePrev} disabled={currentQuestionIndex === 0}>
                     <ArrowLeft className="mr-2" /> Previous
                   </Button>
-                  {currentQuestionIndex < examQuestions.length - 1 ? (
+                  {currentQuestionIndex < questions.length - 1 ? (
                     <Button onClick={handleNext}>
                       Next <ArrowRight className="ml-2" />
                     </Button>

@@ -63,8 +63,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     )
 
     is_email_verified = models.BooleanField(default=False)
-    first_name = models.CharField(max_length=30, blank=True, null=True)
-    last_name = models.CharField(max_length=30, blank=True, null=True)
+    full_name = models.CharField(max_length=100, blank=False, null=False)
+    whatsapp_number = models.CharField(max_length=20, blank=False, null=False)
+    student_id = models.CharField(max_length=50, blank=False, null=False)
     otp = models.CharField(max_length=6, blank=True, null=True)
     date_joined = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)

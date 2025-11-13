@@ -1,7 +1,7 @@
 "use client"; // Add this directive for client-side component
 
 import { Button } from '@/components/ui/button';
-import { Header } from '@/components/layout/Header';
+import  Header  from '@/components/layout/Header';
 import { ArrowRight, Bot, ShieldCheck, Video, ArrowDown, FileText } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useEffect } from 'react'; // Import useState and useEffect
@@ -39,7 +39,7 @@ export default function Home() {
         <section id="home" className="h-screen flex flex-col justify-center items-center text-center relative">
           <div className="mx-auto max-w-3xl px-4">
             <h1 className="text-4xl font-bold tracking-tight text-primary sm:text-5xl md:text-6xl font-headline">
-              Welcome to <br />Self_Made_Dev Exam Portal
+              Welcome to Self_Made_Dev <br></br> Exam Portal
             </h1>
             <p className="mt-6 text-lg leading-8 text-foreground/80">
               An advanced online examination platform with AI-powered proctoring to ensure integrity and fairness.

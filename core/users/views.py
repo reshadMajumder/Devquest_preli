@@ -3,11 +3,20 @@ from django.contrib.auth import authenticate # Added this import
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from .serializers import RegisterSerializer
+from .serializers import RegisterSerializer, UserDetailSerializer
 from .models import User
 from .emails import send_otp_via_email, send_otp_via_email_forgot_password
 from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 from rest_framework_simplejwt.views import TokenRefreshView
+from rest_framework.permissions import IsAuthenticated
+
+
+class UserDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        serializer = UserDetailSerializer(request.user)
+        return Response(serializer.data)
 
 
 class RegisterView(APIView):
@@ -94,14 +103,14 @@ class LoginView(APIView):
             return Response({"error": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
 
 class LogoutView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         try:
             refresh_token = request.data["refresh_token"]
             token = RefreshToken(refresh_token)
             token.blacklist()
-            return Response({"message": "Logout successful."}, status=status.HTTP_205_RESET_CONTENT)
+            return Response({"message": "Logout successful."}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 

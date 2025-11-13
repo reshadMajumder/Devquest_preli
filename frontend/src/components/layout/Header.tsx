@@ -8,8 +8,10 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { authApi } from '@/lib/api'; // Import authApi
 import { useToast } from "@/hooks/use-toast";
+import { jwtDecode } from 'jwt-decode'; // Import jwtDecode
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
-export function Header() {
+export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const { toast } = useToast();
@@ -17,12 +19,24 @@ export function Header() {
   const isExamPage = pathname === '/exam';
   const [activeLink, setActiveLink] = useState('home');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userEmail, setUserEmail] = useState(''); // Added userEmail state
 
   useEffect(() => {
     // Check login status on component mount and when localStorage changes
     const checkLoginStatus = () => {
       const accessToken = localStorage.getItem('access_token');
       setIsLoggedIn(!!accessToken);
+      if (accessToken) {
+        try {
+          const decodedToken: { email: string } = jwtDecode(accessToken); // Assuming 'email' is in the token
+          setUserEmail(decodedToken.email);
+        } catch (error) {
+          console.error("Failed to decode access token:", error);
+          setUserEmail('');
+        }
+      } else {
+        setUserEmail('');
+      }
     };
 
     checkLoginStatus(); // Initial check
@@ -112,12 +126,33 @@ export function Header() {
             </nav>
           )}
 
-          {!isExamPage && (
-            isLoggedIn ? (
-              <Button onClick={handleLogout} className="text-white bg-[#30475f] hover:bg-[#2a3f55] shadow-sm hover:shadow-md transition-all duration-300">
-                <LogOut className="mr-2 h-4 w-4" />
-                Logout
-              </Button>
+          {isLoggedIn ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative h-8 flex items-center justify-center space-x-2 px-4">
+                    <span className="text-sm font-medium">{userEmail}</span>
+                    <User className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">{userEmail}</p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem>
+                    <Link href="/profile" className="flex items-center w-full">
+                      <User className="mr-2 h-4 w-4" />
+                      Profile
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleLogout} className="focus:bg-red-500 focus:text-white">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Log out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : (
               <Button asChild className="text-white bg-[#30475f] hover:bg-[#2a3f55] shadow-sm hover:shadow-md transition-all duration-300">
                 <Link href="/login">
@@ -126,7 +161,7 @@ export function Header() {
                 </Link>
               </Button>
             )
-          )}
+          }
         </div>
       </div>
     </header>

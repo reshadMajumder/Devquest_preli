@@ -1,17 +1,17 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation'; // Import useSearchParams
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Header } from '@/components/layout/Header';
+import Header from '@/components/layout/Header';
 import { useToast } from "@/hooks/use-toast";
 import { authApi } from '@/lib/api';
 import Link from 'next/link';
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const searchParams = useSearchParams(); // Initialize useSearchParams
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
@@ -68,42 +68,50 @@ export default function ResetPasswordPage() {
   };
 
   return (
+    <main className="flex-1 flex items-center justify-center py-12 px-4">
+      <Card className="w-[400px]">
+        <CardHeader>
+          <CardTitle>Reset Password</CardTitle>
+          <CardDescription>
+            Enter the OTP and your new password.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <form onSubmit={handleResetPassword} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" type="email" placeholder="m@diu.edu.bd" required value={email} onChange={(e) => setEmail(e.target.value)} readOnly={isEmailPreFilled} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="otp">OTP</Label>
+              <Input id="otp" type="text" placeholder="XXXXXX" required value={otp} onChange={(e) => setOtp(e.target.value)} maxLength={6} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">New Password</Label>
+              <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password2">Confirm New Password</Label>
+              <Input id="password2" type="password" required value={password2} onChange={(e) => setPassword2(e.target.value)} />
+            </div>
+            <Button type="submit" className="w-full text-white bg-[#30475f] hover:bg-[#006298] shadow-sm hover:shadow-md transition-all duration-300">Reset Password</Button>
+          </form>
+          <div className="flex justify-end text-sm">
+            <Link href="/login" className="text-primary hover:underline">Back to Login</Link>
+          </div>
+        </CardContent>
+      </Card>
+    </main>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
     <>
       <Header />
-      <main className="flex-1 flex items-center justify-center py-12 px-4">
-        <Card className="w-[400px]">
-          <CardHeader>
-            <CardTitle>Reset Password</CardTitle>
-            <CardDescription>
-              Enter the OTP and your new password.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <form onSubmit={handleResetPassword} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" placeholder="m@diu.edu.bd" required value={email} onChange={(e) => setEmail(e.target.value)} readOnly={isEmailPreFilled} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="otp">OTP</Label>
-                <Input id="otp" type="text" placeholder="XXXXXX" required value={otp} onChange={(e) => setOtp(e.target.value)} maxLength={6} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">New Password</Label>
-                <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password2">Confirm New Password</Label>
-                <Input id="password2" type="password" required value={password2} onChange={(e) => setPassword2(e.target.value)} />
-              </div>
-              <Button type="submit" className="w-full text-white bg-[#30475f] hover:bg-[#006298] shadow-sm hover:shadow-md transition-all duration-300">Reset Password</Button>
-            </form>
-            <div className="flex justify-end text-sm">
-              <Link href="/login" className="text-primary hover:underline">Back to Login</Link>
-            </div>
-          </CardContent>
-        </Card>
-      </main>
+      <Suspense fallback={<div>Loading reset password form...</div>}>
+        <ResetPasswordForm />
+      </Suspense>
     </>
   );
 }
