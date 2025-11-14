@@ -1,18 +1,29 @@
 "use client";
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import type { ExamReport } from '@/lib/types';
-import  Header  from '@/components/layout/Header';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, Bot, CheckCircle, FileText, XCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import Link from 'next/link';
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import type { ExamReport } from "@/lib/types";
+import Header from "@/app/layout/Header";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Skeleton } from "@/components/ui/skeleton";
+import { AlertCircle, Bot, CheckCircle, FileText, XCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
+import Link from "next/link";
 
 function ReportSkeleton() {
   return (
@@ -51,7 +62,7 @@ export default function ReportPage() {
 
   useEffect(() => {
     setIsClient(true);
-    const reportData = localStorage.getItem('examReport');
+    const reportData = localStorage.getItem("examReport");
     if (reportData) {
       setReport(JSON.parse(reportData));
       // Do not remove from localStorage immediately
@@ -82,9 +93,10 @@ export default function ReportPage() {
   const audioSnippets = Math.floor(Math.random() * 4) + 2; // 2 to 5
 
   const suspicionLevelStyles = {
-    LOW: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/50 dark:text-green-300 dark:border-green-800',
-    MEDIUM: 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/50 dark:text-yellow-300 dark:border-yellow-800',
-    HIGH: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/50 dark:text-red-300 dark:border-red-800',
+    LOW: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/50 dark:text-green-300 dark:border-green-800",
+    MEDIUM:
+      "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/50 dark:text-yellow-300 dark:border-yellow-800",
+    HIGH: "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/50 dark:text-red-300 dark:border-red-800",
   };
 
   return (
@@ -93,8 +105,12 @@ export default function ReportPage() {
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto space-y-8">
           <div>
-            <h1 className="text-3xl font-bold font-headline text-primary">Exam Report</h1>
-            <p className="text-muted-foreground">Here is a summary of your performance and proctoring analysis.</p>
+            <h1 className="text-3xl font-bold font-headline text-primary">
+              Exam Report
+            </h1>
+            <p className="text-muted-foreground">
+              Here is a summary of your performance and proctoring analysis.
+            </p>
           </div>
 
           <Card>
@@ -103,8 +119,12 @@ export default function ReportPage() {
             </CardHeader>
             <CardContent>
               <div className="text-center">
-                <p className="text-6xl font-bold">{score}/{totalQuestions}</p>
-                <p className="text-muted-foreground">({scorePercentage.toFixed(1)}%)</p>
+                <p className="text-6xl font-bold">
+                  {score}/{totalQuestions}
+                </p>
+                <p className="text-muted-foreground">
+                  ({scorePercentage.toFixed(1)}%)
+                </p>
               </div>
               <Progress value={scorePercentage} className="mt-4" />
             </CardContent>
@@ -124,56 +144,94 @@ export default function ReportPage() {
               </p>
             </CardContent>
           </Card>
-          
+
           <Card>
-             <CardHeader>
+            <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileText /> Answer Review
               </CardTitle>
-              <CardDescription>Review each question and your answer.</CardDescription>
+              <CardDescription>
+                Review each question and your answer.
+              </CardDescription>
             </CardHeader>
             <CardContent>
-                <Accordion type="single" collapsible className="w-full">
-                    {answeredQuestions.map(({ question, selectedAnswer, isCorrect }, index) => {
-                        const optionsArray = typeof question.options === 'string'
-                            ? JSON.parse(question.options)
-                            : question.options;
-                        return (
-                            <AccordionItem value={`item-${index}`} key={question.id}>
-                                <AccordionTrigger className={cn("text-left", isCorrect ? 'text-foreground' : 'text-destructive')}>
-                                    <div className="flex items-center gap-2">
-                                        {isCorrect ? <CheckCircle className="h-5 w-5 text-green-500" /> : <XCircle className="h-5 w-5 text-destructive" />}
-                                        <span>Question {index + 1}: {isCorrect ? 'Correct' : 'Incorrect'}</span>
-                                    </div>
-                                </AccordionTrigger>
-                                <AccordionContent className="space-y-4">
-                                    <p className="font-semibold">{question.question}</p>
-                                    <ul className="space-y-2 text-sm">
-                                        {optionsArray?.map((option, optIndex) => (
-                                            <li key={optIndex} className={cn(
-                                                "flex items-center gap-2 border p-2 rounded-md",
-                                                optIndex === question.correctAnswer ? 'border-green-500 bg-green-500/10' : '',
-                                                optIndex === selectedAnswer && !isCorrect ? 'border-destructive bg-red-500/10' : ''
-                                            )}>
-                                                {optIndex === question.correctAnswer && <CheckCircle className="h-4 w-4 text-green-500" />}
-                                                {optIndex === selectedAnswer && optIndex !== question.correctAnswer && <XCircle className="h-4 w-4 text-destructive" />}
-                                                <span>{option}</span>
-                                                {optIndex === selectedAnswer && <Badge variant="outline">Your Answer</Badge>}
-                                                {optIndex === question.correctAnswer && <Badge variant="outline" className="border-green-500 text-green-600">Correct Answer</Badge>}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </AccordionContent>
-                            </AccordionItem>
-                        );
-                    })}
-                </Accordion>
+              <Accordion type="single" collapsible className="w-full">
+                {answeredQuestions.map(
+                  ({ question, selectedAnswer, isCorrect }, index) => {
+                    const optionsArray =
+                      typeof question.options === "string"
+                        ? JSON.parse(question.options)
+                        : question.options;
+                    return (
+                      <AccordionItem value={`item-${index}`} key={question.id}>
+                        <AccordionTrigger
+                          className={cn(
+                            "text-left",
+                            isCorrect ? "text-foreground" : "text-destructive"
+                          )}
+                        >
+                          <div className="flex items-center gap-2">
+                            {isCorrect ? (
+                              <CheckCircle className="h-5 w-5 text-green-500" />
+                            ) : (
+                              <XCircle className="h-5 w-5 text-destructive" />
+                            )}
+                            <span>
+                              Question {index + 1}:{" "}
+                              {isCorrect ? "Correct" : "Incorrect"}
+                            </span>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="space-y-4">
+                          <p className="font-semibold">{question.question}</p>
+                          <ul className="space-y-2 text-sm">
+                            {optionsArray?.map((option, optIndex) => (
+                              <li
+                                key={optIndex}
+                                className={cn(
+                                  "flex items-center gap-2 border p-2 rounded-md",
+                                  optIndex === question.correctAnswer
+                                    ? "border-green-500 bg-green-500/10"
+                                    : "",
+                                  optIndex === selectedAnswer && !isCorrect
+                                    ? "border-destructive bg-red-500/10"
+                                    : ""
+                                )}
+                              >
+                                {optIndex === question.correctAnswer && (
+                                  <CheckCircle className="h-4 w-4 text-green-500" />
+                                )}
+                                {optIndex === selectedAnswer &&
+                                  optIndex !== question.correctAnswer && (
+                                    <XCircle className="h-4 w-4 text-destructive" />
+                                  )}
+                                <span>{option}</span>
+                                {optIndex === selectedAnswer && (
+                                  <Badge variant="outline">Your Answer</Badge>
+                                )}
+                                {optIndex === question.correctAnswer && (
+                                  <Badge
+                                    variant="outline"
+                                    className="border-green-500 text-green-600"
+                                  >
+                                    Correct Answer
+                                  </Badge>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </AccordionContent>
+                      </AccordionItem>
+                    );
+                  }
+                )}
+              </Accordion>
             </CardContent>
           </Card>
 
           <div className="text-center pt-4">
-             <Button asChild size="lg">
-                <Link href="/">Back to Homepage</Link>
+            <Button asChild size="lg">
+              <Link href="/">Back to Homepage</Link>
             </Button>
           </div>
         </div>

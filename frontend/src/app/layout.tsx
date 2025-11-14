@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
-import { ClientOnly } from "@/components/layout/ClientOnly";
-import { Footer } from "@/components/layout/Footer";
+import { ClientOnly } from "@/app/layout/ClientOnly";
+import { Footer } from "@/app/layout/Footer";
 import Particles from "@/components/react-bits/Particle";
 
 export const metadata: Metadata = {

@@ -1,7 +1,7 @@
 "use client"; // Add this directive for client-side component
 
 import { Button } from "@/components/ui/button";
-import Header from "@/components/layout/Header";
+import Header from "@/app/layout/Header";
 import {
   ArrowRight,
   Bot,

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import Header from "@/components/layout/Header";
+import Header from "@/app/layout/Header";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -453,7 +453,7 @@ export default function ExamPage() {
               <CardContent className="space-y-4">
                 <p>
                   This is a closed-book, multiple-choice assessment designed to
-                  test your core understanding.
+                  test your aptitude.
                 </p>
                 <p>
                   To protect the integrity of your results and ensure a level
