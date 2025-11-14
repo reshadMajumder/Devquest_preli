@@ -45,9 +45,9 @@ export default function Home() {
       {/* Particles Background */}
       <Header />{" "}
       <main className="flex-1">
-        {/* <section
+        <section
           id="home"
-          className="h-screen flex flex-col justify-center items-center text-center relative"
+          className="py-24 flex flex-col justify-center items-center text-center relative"
         >
           <div className="mx-auto max-w-3xl px-4">
             <h1 className="text-4xl font-bold tracking-tight text-primary sm:text-5xl md:text-6xl font-headline">
@@ -55,16 +55,16 @@ export default function Home() {
             </h1>
 
             <TextType
-              text={["Hello learners", "Welcome abroad"]}
-              typingSpeed={75}
+              className="sm:px-10 sm:mt-10"
+              text={[
+                "Welcome to an advanced online examination platform with AI-powered proctoringto ensure integrity and fairness among the learners",
+              ]}
+              typingSpeed={100}
               pauseDuration={1500}
               showCursor={true}
               cursorCharacter="|"
             />
-            <p className="lg:mt-6 mt-1 text-lg leading-tight lg:leading-none">
-              An advanced online examination platform with AI-powered proctoring
-              to ensure integrity and fairness.
-            </p>
+
             <div className="mt-10 flex items-center justify-center gap-x-6">
               <Button asChild size="lg">
                 <Link
@@ -84,11 +84,11 @@ export default function Home() {
               <ArrowDown className="h-8 w-8 text-primary" />
             </a>
           </div> */}
-        {/* </section>  */}
+        </section>
 
         <section
           id="how-it-works"
-          className="flex flex-col justify-center container mx-auto px-4 py-16"
+          className="flex flex-col justify-center container mx-auto lg:px-6 px-12 pb-20"
         >
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-primary font-headline">
@@ -99,6 +99,7 @@ export default function Home() {
               seamless and secure testing experience.
             </p>
           </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
             <div className="flex flex-col items-center text-center">
               <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">

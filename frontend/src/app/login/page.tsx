@@ -118,7 +118,7 @@ export default function LoginPage() {
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="login-email">Email</Label>
-                    <Input id="login-email" type="email" placeholder="m@diu.edu.bd" required value={email} onChange={(e) => setEmail(e.target.value)} />
+                    <Input id="login-email" type="email" placeholder="251-35-417@diu.edu.bd" required value={email} onChange={(e) => setEmail(e.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="login-password">Password</Label>
@@ -167,15 +167,15 @@ export default function LoginPage() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="register-whatsapp-number">WhatsApp Number</Label>
-                    <Input id="register-whatsapp-number" type="text" placeholder="e.g., +8801XXXXXXXXX" required value={whatsappNumber} onChange={(e) => setWhatsappNumber(e.target.value)} />
+                    <Input id="register-whatsapp-number" type="text" placeholder="+8801XXXXXXXXX" required value={whatsappNumber} onChange={(e) => setWhatsappNumber(e.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="register-student-id">Student ID</Label>
-                    <Input id="register-student-id" type="text" placeholder="e.g., 202XXXXXXX" required value={studentId} onChange={(e) => setStudentId(e.target.value)} />
+                    <Input id="register-student-id" type="text" placeholder="202XXXXXXX" required value={studentId} onChange={(e) => setStudentId(e.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="register-email">Email</Label>
-                    <Input id="register-email" type="email" placeholder="m@diu.edu.bd" required value={email} onChange={(e) => setEmail(e.target.value)} />
+                    <Input id="register-email" type="email" placeholder="251-35-417@diu.edu.bd" required value={email} onChange={(e) => setEmail(e.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="register-password">Password</Label>
