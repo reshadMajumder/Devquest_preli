@@ -191,7 +191,7 @@ export default function LoginPage() {
                     Login
                   </Button>
                 </form>
-                <div className="relative">
+                {/* <div className="relative">
                   <div className="absolute inset-0 flex items-center">
                     <span className="w-full border-t" />
                   </div>
@@ -200,15 +200,15 @@ export default function LoginPage() {
                       Or continue with
                     </span>
                   </div>
-                </div>
-                <Button
+                </div> */}
+                {/* <Button
                   variant="outline"
                   className="w-full"
                   onClick={handleGoogleLogin}
                 >
                   <GoogleIcon />
                   Sign in with Google
-                </Button>
+                </Button> */}
               </CardContent>
             </Card>
           </TabsContent>
