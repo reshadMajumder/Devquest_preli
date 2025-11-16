@@ -57,7 +57,9 @@ export default function Home() {
             <TextType
               className="sm:px-10 sm:mt-10"
               text={[
-                "Welcome to an advanced online examination platform with AI-powered proctoringto ensure integrity and fairness among the learners",
+                "Welcome to our online examination platform ",
+                "It uses an AI-powered proctoring tool to ensure integrity and fairness among the learners",
+                "We take stactic images to compare the movement to prevent plagiarism",
               ]}
               typingSpeed={100}
               pauseDuration={1500}
@@ -100,8 +102,8 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-            <div className="flex flex-col items-center text-center">
+          <div className=" grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-10 lg:px-32">
+            <div className="flex flex-col items-center text-center border  lg:p-4 lg:rounded-xl bg-gray-300 shadow-xl">
               <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
                 <ShieldCheck className="h-8 w-8" />
               </div>
@@ -111,7 +113,7 @@ export default function Home() {
                 unauthorized activities.
               </p>
             </div>
-            <div className="flex flex-col items-center text-center">
+            <div className="flex flex-col items-center text-center border  lg:p-4 lg:rounded-xl bg-gray-300 shadow-xl">
               <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
                 <Video className="h-8 w-8" />
               </div>
@@ -121,7 +123,7 @@ export default function Home() {
                 for any irregularities.
               </p>
             </div>
-            <div className="flex flex-col items-center text-center">
+            <div className="flex flex-col items-center text-center border  lg:p-4 lg:rounded-xl bg-gray-300 shadow-xl">
               <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
                 <Bot className="h-8 w-8" />
               </div>
@@ -131,7 +133,7 @@ export default function Home() {
                 provides a detailed report.
               </p>
             </div>
-            <div className="flex flex-col items-center text-center">
+            <div className="flex flex-col items-center text-center border lg:p-4 lg:rounded-xl bg-gray-300 shadow-xl">
               <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
                 <FileText className="h-8 w-8" />
               </div>
