@@ -557,7 +557,7 @@ export default function ExamPage() {
                   </AlertDescription>
                 </Alert>
               </CardContent>
-              {/* <CardFooter>
+              <CardFooter>
                 <Button
                   size="lg"
                   onClick={handleStartExam}
@@ -577,7 +577,7 @@ export default function ExamPage() {
                     ? "Retry Camera Access"
                     : "START SECURE EXAM"}
                 </Button>
-              </CardFooter> */}
+              </CardFooter>
             </Card>
           ) : null}
 
