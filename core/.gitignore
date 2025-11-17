@@ -125,7 +125,6 @@ GitHub.sublime-settings
 .history
 
 
-staticfiles/
 
 # Ignore all migration files except for __init__.py
 **/migrations/*
