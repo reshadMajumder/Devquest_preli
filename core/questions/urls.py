@@ -3,7 +3,8 @@ from .views import (
     QuestionListCreateAPIView,
     QuestionRetrieveUpdateDestroyAPIView,
     ExamineeQuestionListAPIView,
-    SubmitExamAPIView
+    SubmitExamAPIView,
+    SubmitExamResultAPIView,
 )
 
 urlpatterns = [
@@ -14,4 +15,5 @@ urlpatterns = [
     # Examinee URLs for taking the exam
     path('exam/questions/', ExamineeQuestionListAPIView.as_view(), name='examinee-question-list'),
     path('exam/submit/', SubmitExamAPIView.as_view(), name='exam-submit'),
+    path('v2/exam/submit/', SubmitExamResultAPIView.as_view(), name='exam-result'),
 ]

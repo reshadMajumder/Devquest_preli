@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "users",
     "corsheaders",
     "questions", 
+    "quiz",
 ]
 
 MIDDLEWARE = [
