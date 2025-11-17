@@ -27,8 +27,7 @@ import {
   TimerIcon,
   LogOut,
 } from "lucide-react";
-import { useMediaRecorder } from "@/hooks/use-media-recorder";
-import { cn } from "@/lib/utils";
+ 
 import Draggable from "react-draggable";
 
 import { authApi, examApi } from "@/lib/api"; // Import authApi and examApi
@@ -159,37 +158,17 @@ export default function ExamPage() {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const draggableRef = useRef<HTMLDivElement>(null);
-  const {
-    status,
-    startRecording,
-    stopRecording,
-    error: recorderError,
-  } = useMediaRecorder();
+  
 
   const handleSubmit = useCallback(async () => {
     setExamState("submitting");
-
-    const videoDataUri = await stopRecording();
 
     if (videoRef.current && videoRef.current.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
       stream.getTracks().forEach((track) => track.stop());
       videoRef.current.srcObject = null;
     }
-
-    if (!videoDataUri && hasCameraPermission) {
-      toast({
-        variant: "destructive",
-        title: "Recording Error",
-        description:
-          "Could not retrieve the exam recording. Submission failed.",
-      });
-      setExamState("active");
-      return;
-    }
-
-    const finalVideoDataUri = hasCameraPermission ? videoDataUri || "" : "";
-    const proctoringResult = await getProctoringAnalysis(finalVideoDataUri);
+    const proctoringResult = await getProctoringAnalysis("");
 
     // Prepare answers for API submission
     // Map option index (0,1,2,3) to letter (A,B,C,D)
@@ -264,7 +243,6 @@ export default function ExamPage() {
     hasCameraPermission,
     questions,
     router,
-    stopRecording,
     toast,
     handleSessionExpiration,
   ]);
@@ -286,7 +264,6 @@ export default function ExamPage() {
   }, [examState, handleSubmit]);
 
   useEffect(() => {
-    // Cleanup function to stop camera on component unmount
     return () => {
       if (videoRef.current && videoRef.current.srcObject) {
         const stream = videoRef.current.srcObject as MediaStream;
@@ -295,23 +272,15 @@ export default function ExamPage() {
     };
   }, []);
 
-  useEffect(() => {
-    if (recorderError) {
-      setExamState("error");
-      toast({
-        variant: "destructive",
-        title: "Recording Error",
-        description: recorderError.message,
-      });
-    }
-  }, [recorderError, toast]);
+  
+  
 
   const handleStartExam = async () => {
     setExamState("permission");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user" },
-        audio: true,
+        audio: false,
       });
       setHasCameraPermission(true);
 
@@ -319,7 +288,6 @@ export default function ExamPage() {
         videoRef.current.srcObject = stream;
       }
 
-      startRecording(stream);
 
       // Fetch questions after camera access is granted
       setLoadingQuestions(true);
@@ -377,7 +345,7 @@ export default function ExamPage() {
         variant: "destructive",
         title: "Camera Access Denied",
         description:
-          "You must grant camera and microphone access to start the exam. Please enable permissions and try again.",
+          "You must grant camera access to start the exam. Please enable permissions and try again.",
       });
     }
   };
@@ -444,15 +412,10 @@ export default function ExamPage() {
             <Card className="w-32 shadow-lg">
               <CardHeader className="p-2 flex-row items-center gap-2">
                 <Video
-                  className={cn(
-                    "h-4 w-4",
-                    status === "recording"
-                      ? "text-destructive animate-pulse"
-                      : "text-muted-foreground"
-                  )}
+                  className={"h-4 w-4 text-muted-foreground"}
                 />
                 <CardTitle className="text-sm">
-                  {status === "recording" ? "Recording..." : "Camera"}
+                  {"Camera"}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0 relative">
