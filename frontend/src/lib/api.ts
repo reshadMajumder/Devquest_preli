@@ -51,7 +51,7 @@ export async function apiRequest<T>(
 
     if (!response.ok) {
       // Handle specific error messages from backend
-      const errorMessage = responseData.error || responseData.message || 'An unknown error occurred.';
+      const errorMessage = responseData.detail || responseData.error || responseData.message || 'An unknown error occurred.';
       console.log(`API Request to ${endpoint} failed: ${errorMessage}`);
       return { success: false, error: errorMessage };
     }
@@ -78,6 +78,6 @@ export const authApi = {
 };
 
 export const examApi = {
-  getExamQuestions: () => apiRequest('/api/questions/exam/questions/', 'GET', undefined, true),
-  submitExamAnswers: (data: any) => apiRequest('/api/questions/exam/submit/', 'POST', data, true),
+  getExamQuestions: () => apiRequest('/api/quiz/questions/', 'GET', undefined, true),
+  submitExamAnswers: (data: any) => apiRequest('/api/quiz/submit/', 'POST', data, true),
 };

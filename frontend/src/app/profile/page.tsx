@@ -12,7 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { authApi } from "@/lib/api";
+import { authApi, examApi } from "@/lib/api";
 import { Loader2, LogOut, CheckCircle, XCircle } from "lucide-react";
 import {
   Accordion,
@@ -48,12 +48,31 @@ interface AnsweredQuestion {
   isCorrect: boolean;
 }
 
+// New format from quiz API
+interface QuizAnswerItem {
+  q_id: number;
+  ans: string; // "A", "B", "C", or "D"
+  valid: boolean;
+  is_correct?: boolean;
+  reason?: string;
+}
+
+interface QuizQuestion {
+  id: number;
+  text: string;
+  option_a: string;
+  option_b: string;
+  option_c: string;
+  option_d: string;
+}
+
 export default function ProfilePage() {
   const router = useRouter();
   const { toast } = useToast();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [parsedExamAnswers, setParsedExamAnswers] = useState<AnsweredQuestion[]>([]);
 
   const handleSessionExpiration = useCallback(() => {
     toast({
@@ -73,7 +92,58 @@ export default function ProfilePage() {
       const response = await authApi.getUserDetails();
 
       if (response.success && response.data) {
-        setUserProfile(response.data as UserProfile);
+        const profile = response.data as UserProfile;
+        setUserProfile(profile);
+
+        // Parse and enrich exam answers if available
+        if (profile.exam_attempted && profile.exam_answers) {
+          try {
+            const answersData = JSON.parse(profile.exam_answers) as QuizAnswerItem[];
+            
+            // Check if it's the new format (has q_id) or old format (has question object)
+            if (answersData.length > 0 && 'q_id' in answersData[0]) {
+              // New format - need to fetch questions to get full details
+              const questionsResponse = await examApi.getExamQuestions();
+              if (questionsResponse.success && questionsResponse.data) {
+                const questionsData = questionsResponse.data as { questions: QuizQuestion[] };
+                const questionsMap = new Map(questionsData.questions.map(q => [q.id, q]));
+                
+                // Map to the expected format
+                const enrichedAnswers: AnsweredQuestion[] = answersData
+                  .filter(item => item.valid && questionsMap.has(item.q_id))
+                  .map(item => {
+                    const question = questionsMap.get(item.q_id)!;
+                    const ansIndex = ['A', 'B', 'C', 'D'].indexOf(item.ans);
+                    const options = JSON.stringify([
+                      question.option_a,
+                      question.option_b,
+                      question.option_c,
+                      question.option_d,
+                    ]);
+                    
+                    return {
+                      question: {
+                        id: question.id,
+                        question: question.text,
+                        options: options,
+                        correctAnswer: -1, // Not available in new API
+                      },
+                      selectedAnswer: ansIndex >= 0 ? ansIndex : null,
+                      isCorrect: item.is_correct || false,
+                    };
+                  });
+                
+                setParsedExamAnswers(enrichedAnswers);
+              }
+            } else {
+              // Old format - use as is
+              setParsedExamAnswers(answersData as any);
+            }
+          } catch (e) {
+            console.error("Failed to parse exam answers:", e);
+            setParsedExamAnswers([]);
+          }
+        }
       } else {
         if (response.error === "Authentication required.") {
           handleSessionExpiration();
@@ -165,14 +235,6 @@ export default function ProfilePage() {
     );
   }
 
-  let parsedExamAnswers: AnsweredQuestion[] = [];
-  if (userProfile.exam_attempted && userProfile.exam_answers) {
-    try {
-      parsedExamAnswers = JSON.parse(userProfile.exam_answers);
-    } catch (e) {
-      console.error("Failed to parse exam answers:", e);
-    }
-  }
 
   return (
     <>
@@ -240,6 +302,11 @@ export default function ProfilePage() {
               <CardContent>
                 <Accordion type="single" collapsible className="w-full">
                   {parsedExamAnswers.map((answeredQuestion, index) => {
+                    // Safety check: ensure question exists
+                    if (!answeredQuestion.question) {
+                      return null;
+                    }
+                    
                     const optionsArray =
                       typeof answeredQuestion.question.options === "string"
                         ? JSON.parse(answeredQuestion.question.options)
@@ -277,49 +344,48 @@ export default function ProfilePage() {
                           </p>
                           <ul className="space-y-2 text-sm">
                             {optionsArray?.map(
-                              (option: string, optIndex: number) => (
-                                <li
-                                  key={optIndex}
-                                  className={cn(
-                                    "flex items-center gap-2 border p-2 rounded-md",
-                                    optIndex ===
-                                      answeredQuestion.question.correctAnswer
-                                      ? "border-green-500 bg-green-500/10"
-                                      : "",
-                                    optIndex ===
-                                      answeredQuestion.selectedAnswer &&
-                                      !answeredQuestion.isCorrect
-                                      ? "border-destructive bg-red-500/10"
-                                      : ""
-                                  )}
-                                >
-                                  {optIndex ===
-                                    answeredQuestion.question.correctAnswer && (
-                                    <CheckCircle className="h-4 w-4 text-green-500" />
-                                  )}
-                                  {optIndex ===
-                                    answeredQuestion.selectedAnswer &&
-                                    optIndex !==
-                                      answeredQuestion.question
-                                        .correctAnswer && (
-                                      <XCircle className="h-4 w-4 text-destructive" />
+                              (option: string, optIndex: number) => {
+                                // Skip showing correct answer badge if correctAnswer is -1 (not available)
+                                const isCorrectAnswer = answeredQuestion.question.correctAnswer >= 0 && 
+                                  optIndex === answeredQuestion.question.correctAnswer;
+                                const isSelectedAnswer = optIndex === answeredQuestion.selectedAnswer;
+                                
+                                return (
+                                  <li
+                                    key={optIndex}
+                                    className={cn(
+                                      "flex items-center gap-2 border p-2 rounded-md",
+                                      isCorrectAnswer
+                                        ? "border-green-500 bg-green-500/10"
+                                        : "",
+                                      isSelectedAnswer &&
+                                        !answeredQuestion.isCorrect
+                                        ? "border-destructive bg-red-500/10"
+                                        : ""
                                     )}
-                                  <span>{option}</span>
-                                  {optIndex ===
-                                    answeredQuestion.selectedAnswer && (
-                                    <Badge variant="outline">Your Answer</Badge>
-                                  )}
-                                  {optIndex ===
-                                    answeredQuestion.question.correctAnswer && (
-                                    <Badge
-                                      variant="outline"
-                                      className="border-green-500 text-green-600"
-                                    >
-                                      Correct Answer
-                                    </Badge>
-                                  )}
-                                </li>
-                              )
+                                  >
+                                    {isCorrectAnswer && (
+                                      <CheckCircle className="h-4 w-4 text-green-500" />
+                                    )}
+                                    {isSelectedAnswer &&
+                                      !isCorrectAnswer && (
+                                        <XCircle className="h-4 w-4 text-destructive" />
+                                      )}
+                                    <span>{option}</span>
+                                    {isSelectedAnswer && (
+                                      <Badge variant="outline">Your Answer</Badge>
+                                    )}
+                                    {isCorrectAnswer && (
+                                      <Badge
+                                        variant="outline"
+                                        className="border-green-500 text-green-600"
+                                      >
+                                        Correct Answer
+                                      </Badge>
+                                    )}
+                                  </li>
+                                );
+                              }
                             )}
                           </ul>
                         </AccordionContent>

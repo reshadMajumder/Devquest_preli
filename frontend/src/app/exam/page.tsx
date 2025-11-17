@@ -37,7 +37,10 @@ import { authApi, examApi } from "@/lib/api"; // Import authApi and examApi
 interface Question {
   id: number;
   text: string;
-  options: string; // It's a JSON string from the backend
+  option_a: string;
+  option_b: string;
+  option_c: string;
+  option_d: string;
 }
 
 interface ReportQuestion {
@@ -60,6 +63,24 @@ interface ExamReport {
   answeredQuestions: AnsweredQuestion[];
 }
 
+interface QuizSubmitResponse {
+  message: string;
+  marks: number;
+  total_questions_submitted: number;
+  invalid_question_ids: number[];
+  per_question: Array<{
+    q_id: number;
+    ans: string;
+    valid: boolean;
+    is_correct?: boolean;
+    reason?: string;
+  }>;
+}
+
+interface QuizQuestionsResponse {
+  questions: Question[];
+}
+
 type ExamState = "idle" | "permission" | "active" | "submitting" | "error";
 
 const EXAM_TIME_LIMIT = 25 * 60; // 25 minutes in seconds
@@ -73,6 +94,7 @@ export default function ExamPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [questions, setQuestions] = useState<Question[]>([]); // State to store fetched questions
   const [loadingQuestions, setLoadingQuestions] = useState(true); // Loading state for questions
+  const [examAlreadyAttempted, setExamAlreadyAttempted] = useState(false); // Track if exam was already attempted
 
   useEffect(() => {
     const checkLoginStatus = () => {
@@ -170,10 +192,15 @@ export default function ExamPage() {
     const proctoringResult = await getProctoringAnalysis(finalVideoDataUri);
 
     // Prepare answers for API submission
-    const answersToSubmit = questions.map((q, index) => ({
-      question_id: q.id,
-      selected_option_index: answers[index],
-    }));
+    // Map option index (0,1,2,3) to letter (A,B,C,D)
+    const indexToLetter = ["A", "B", "C", "D"];
+    const answersToSubmit = questions.map((q, index) => {
+      const selectedIndex = answers[index];
+      return {
+        q_id: q.id,
+        ans: selectedIndex !== null ? indexToLetter[selectedIndex] : null,
+      };
+    }).filter(answer => answer.ans !== null); // Filter out unanswered questions
 
     try {
       const submissionResponse = await examApi.submitExamAnswers({
@@ -181,11 +208,27 @@ export default function ExamPage() {
       });
 
       if (submissionResponse.success) {
+        // Map the new API response format to the expected report format
+        const submitData = submissionResponse.data as QuizSubmitResponse;
         const report: ExamReport = {
-          score: submissionResponse.data.score,
-          totalQuestions: submissionResponse.data.totalQuestions,
+          score: submitData.marks || 0,
+          totalQuestions: submitData.total_questions_submitted || questions.length,
           proctoringResult,
-          answeredQuestions: submissionResponse.data.answeredQuestions,
+          answeredQuestions: submitData.per_question?.map((item) => ({
+            question: {
+              id: item.q_id,
+              question: questions.find(q => q.id === item.q_id)?.text || "",
+              options: JSON.stringify([
+                questions.find(q => q.id === item.q_id)?.option_a || "",
+                questions.find(q => q.id === item.q_id)?.option_b || "",
+                questions.find(q => q.id === item.q_id)?.option_c || "",
+                questions.find(q => q.id === item.q_id)?.option_d || "",
+              ]),
+              correctAnswer: -1, // Not provided in new API
+            },
+            selectedAnswer: item.ans ? ["A", "B", "C", "D"].indexOf(item.ans) : null,
+            isCorrect: item.is_correct || false,
+          })) || [],
         };
         localStorage.setItem("examReport", JSON.stringify(report));
         toast({
@@ -264,32 +307,6 @@ export default function ExamPage() {
   }, [recorderError, toast]);
 
   const handleStartExam = async () => {
-    // First, check if the user has already attempted the exam
-    const userDetailsResponse = await authApi.getUserDetails();
-
-    if (userDetailsResponse.success && userDetailsResponse.data) {
-      if (userDetailsResponse.data.exam_attempted) {
-        toast({
-          variant: "destructive",
-          title: "Exam Already Attempted",
-          description: "You have no attempts left.",
-        });
-        return;
-      }
-    } else {
-      // Handle error while fetching user details
-      if (userDetailsResponse.error === "Authentication required.") {
-        handleSessionExpiration();
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Could not verify exam status. Please try again.",
-        });
-      }
-      return;
-    }
-
     setExamState("permission");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -309,10 +326,28 @@ export default function ExamPage() {
       try {
         const response = await examApi.getExamQuestions();
 
-        if (response.success && Array.isArray(response.data)) {
-          setQuestions(response.data);
-          setAnswers(Array(response.data.length).fill(null));
-          setExamState("active");
+        // Check if user already attempted (403 response)
+        if (!response.success && response.error === "You already attempted the exam.") {
+          setExamAlreadyAttempted(true);
+          setExamState("error");
+          setLoadingQuestions(false);
+          return;
+        }
+
+        if (response.success && response.data) {
+          const questionsData = response.data as QuizQuestionsResponse;
+          if (questionsData.questions && Array.isArray(questionsData.questions)) {
+            setQuestions(questionsData.questions);
+            setAnswers(Array(questionsData.questions.length).fill(null));
+            setExamState("active");
+          } else {
+            toast({
+              variant: "destructive",
+              title: "Failed to load questions",
+              description: "Invalid response format from server.",
+            });
+            setExamState("error");
+          }
         } else {
           if (response.error === "Authentication required.") {
             handleSessionExpiration();
@@ -378,11 +413,15 @@ export default function ExamPage() {
       .padStart(2, "0")}`;
   };
 
-  // New variable for parsing options
-  const optionsArray =
-    typeof currentQuestion?.options === "string"
-      ? JSON.parse(currentQuestion.options)
-      : currentQuestion?.options;
+  // Map question options to array format
+  const optionsArray = currentQuestion
+    ? [
+        currentQuestion.option_a,
+        currentQuestion.option_b,
+        currentQuestion.option_c,
+        currentQuestion.option_d,
+      ]
+    : [];
 
   return (
     <>
@@ -440,7 +479,26 @@ export default function ExamPage() {
         </Draggable>
 
         <div className="max-w-4xl mx-auto">
-          {examState === "idle" || examState === "error" ? (
+          {examAlreadyAttempted ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-2xl font-headline text-destructive">
+                  Exam Already Attempted
+                </CardTitle>
+                <CardDescription>
+                  You have already attempted the exam.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Alert variant="destructive">
+                  <AlertTitle>No More Attempts</AlertTitle>
+                  <AlertDescription>
+                    You have already completed the exam and cannot attempt it again.
+                  </AlertDescription>
+                </Alert>
+              </CardContent>
+            </Card>
+          ) : examState === "idle" || examState === "error" ? (
             <Card>
               <CardHeader>
                 <CardTitle className="text-2xl font-headline">
