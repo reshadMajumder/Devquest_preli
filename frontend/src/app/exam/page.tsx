@@ -27,7 +27,7 @@ import {
   TimerIcon,
   LogOut,
 } from "lucide-react";
- 
+
 import Draggable from "react-draggable";
 
 import { authApi, examApi } from "@/lib/api"; // Import authApi and examApi
@@ -158,7 +158,6 @@ export default function ExamPage() {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const draggableRef = useRef<HTMLDivElement>(null);
-  
 
   const handleSubmit = useCallback(async () => {
     setExamState("submitting");
@@ -173,13 +172,15 @@ export default function ExamPage() {
     // Prepare answers for API submission
     // Map option index (0,1,2,3) to letter (A,B,C,D)
     const indexToLetter = ["A", "B", "C", "D"];
-    const answersToSubmit = questions.map((q, index) => {
-      const selectedIndex = answers[index];
-      return {
-        q_id: q.id,
-        ans: selectedIndex !== null ? indexToLetter[selectedIndex] : null,
-      };
-    }).filter(answer => answer.ans !== null); // Filter out unanswered questions
+    const answersToSubmit = questions
+      .map((q, index) => {
+        const selectedIndex = answers[index];
+        return {
+          q_id: q.id,
+          ans: selectedIndex !== null ? indexToLetter[selectedIndex] : null,
+        };
+      })
+      .filter((answer) => answer.ans !== null); // Filter out unanswered questions
 
     try {
       const submissionResponse = await examApi.submitExamAnswers({
@@ -191,23 +192,27 @@ export default function ExamPage() {
         const submitData = submissionResponse.data as QuizSubmitResponse;
         const report: ExamReport = {
           score: submitData.marks || 0,
-          totalQuestions: submitData.total_questions_submitted || questions.length,
+          totalQuestions:
+            submitData.total_questions_submitted || questions.length,
           proctoringResult,
-          answeredQuestions: submitData.per_question?.map((item) => ({
-            question: {
-              id: item.q_id,
-              question: questions.find(q => q.id === item.q_id)?.text || "",
-              options: JSON.stringify([
-                questions.find(q => q.id === item.q_id)?.option_a || "",
-                questions.find(q => q.id === item.q_id)?.option_b || "",
-                questions.find(q => q.id === item.q_id)?.option_c || "",
-                questions.find(q => q.id === item.q_id)?.option_d || "",
-              ]),
-              correctAnswer: -1, // Not provided in new API
-            },
-            selectedAnswer: item.ans ? ["A", "B", "C", "D"].indexOf(item.ans) : null,
-            isCorrect: item.is_correct || false,
-          })) || [],
+          answeredQuestions:
+            submitData.per_question?.map((item) => ({
+              question: {
+                id: item.q_id,
+                question: questions.find((q) => q.id === item.q_id)?.text || "",
+                options: JSON.stringify([
+                  questions.find((q) => q.id === item.q_id)?.option_a || "",
+                  questions.find((q) => q.id === item.q_id)?.option_b || "",
+                  questions.find((q) => q.id === item.q_id)?.option_c || "",
+                  questions.find((q) => q.id === item.q_id)?.option_d || "",
+                ]),
+                correctAnswer: -1, // Not provided in new API
+              },
+              selectedAnswer: item.ans
+                ? ["A", "B", "C", "D"].indexOf(item.ans)
+                : null,
+              isCorrect: item.is_correct || false,
+            })) || [],
         };
         localStorage.setItem("examReport", JSON.stringify(report));
         toast({
@@ -272,9 +277,6 @@ export default function ExamPage() {
     };
   }, []);
 
-  
-  
-
   const handleStartExam = async () => {
     setExamState("permission");
     try {
@@ -288,14 +290,16 @@ export default function ExamPage() {
         videoRef.current.srcObject = stream;
       }
 
-
       // Fetch questions after camera access is granted
       setLoadingQuestions(true);
       try {
         const response = await examApi.getExamQuestions();
 
         // Check if user already attempted (403 response)
-        if (!response.success && response.error === "You already attempted the exam.") {
+        if (
+          !response.success &&
+          response.error === "You already attempted the exam."
+        ) {
           setExamAlreadyAttempted(true);
           setExamState("error");
           setLoadingQuestions(false);
@@ -304,7 +308,10 @@ export default function ExamPage() {
 
         if (response.success && response.data) {
           const questionsData = response.data as QuizQuestionsResponse;
-          if (questionsData.questions && Array.isArray(questionsData.questions)) {
+          if (
+            questionsData.questions &&
+            Array.isArray(questionsData.questions)
+          ) {
             setQuestions(questionsData.questions);
             setAnswers(Array(questionsData.questions.length).fill(null));
             setExamState("active");
@@ -411,12 +418,8 @@ export default function ExamPage() {
           >
             <Card className="w-32 shadow-lg">
               <CardHeader className="p-2 flex-row items-center gap-2">
-                <Video
-                  className={"h-4 w-4 text-muted-foreground"}
-                />
-                <CardTitle className="text-sm">
-                  {"Camera"}
-                </CardTitle>
+                <Video className={"h-4 w-4 text-muted-foreground"} />
+                <CardTitle className="text-sm">{"Camera"}</CardTitle>
               </CardHeader>
               <CardContent className="p-0 relative">
                 <video
@@ -456,7 +459,8 @@ export default function ExamPage() {
                 <Alert variant="destructive">
                   <AlertTitle>No More Attempts</AlertTitle>
                   <AlertDescription>
-                    You have already completed the exam and cannot attempt it again.
+                    You have already completed the exam and cannot attempt it
+                    again.
                   </AlertDescription>
                 </Alert>
               </CardContent>
@@ -520,7 +524,7 @@ export default function ExamPage() {
                   </AlertDescription>
                 </Alert>
               </CardContent>
-              <CardFooter>
+              {/* <CardFooter>
                 <Button
                   size="lg"
                   onClick={handleStartExam}
@@ -540,7 +544,7 @@ export default function ExamPage() {
                     ? "Retry Camera Access"
                     : "START SECURE EXAM"}
                 </Button>
-              </CardFooter>
+              </CardFooter> */}
             </Card>
           ) : null}
 
