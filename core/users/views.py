@@ -197,4 +197,19 @@ class RefreshTokenView(TokenRefreshView):
     """
     API endpoint to refresh JWT token.
     """
-    pass
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        refresh_token = request.data.get('refresh')
+        if not refresh_token:
+            return Response({"error": "Refresh token is required."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            refresh = RefreshToken(refresh_token)
+            access = refresh.access_token
+            return Response({
+                "message": "Token refreshed successfully.",
+                "refresh": str(refresh),
+                "access": str(access)
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)

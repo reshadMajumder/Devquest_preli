@@ -39,6 +39,35 @@ export async function apiRequest<T>(
 
     console.log(`API Response Status for ${endpoint}: ${response.status}`);
 
+    if (requireAuth && response.status === 401) {
+      const refreshed = await refreshAccessToken();
+      if (refreshed) {
+        const newAccess = localStorage.getItem('access_token');
+        if (newAccess) headers['Authorization'] = `Bearer ${newAccess}`;
+        const retry = await fetch(url, {
+          method,
+          headers,
+          body: data ? JSON.stringify(data) : undefined,
+        });
+        if (retry.headers.get('content-type')?.includes('text/html')) {
+          const errorText = await retry.text();
+          console.error(`API Error (HTML response) for ${endpoint} after refresh:`, errorText);
+          return { success: false, error: `Server error: ${retry.status} ${retry.statusText}` };
+        }
+        const retryData = await retry.json();
+        if (!retry.ok) {
+          const errorMessage = retryData.detail || retryData.error || retryData.message || 'An unknown error occurred.';
+          console.log(`API Request to ${endpoint} failed after refresh: ${errorMessage}`);
+          return { success: false, error: errorMessage };
+        }
+        console.log(`API Request to ${endpoint} successful after refresh.`);
+        return { success: true, data: retryData };
+      } else {
+        console.log(`API Request to ${endpoint} unauthorized and refresh failed.`);
+        return { success: false, error: 'Authentication required.' };
+      }
+    }
+
     // Check if response is not OK and if it's not JSON
     if (!response.ok && response.headers.get('content-type')?.includes('text/html')) {
       const errorText = await response.text();
@@ -81,3 +110,18 @@ export const examApi = {
   getExamQuestions: () => apiRequest('/api/quiz/questions/', 'GET', undefined, true),
   submitExamAnswers: (data: any) => apiRequest('/api/quiz/submit/', 'POST', data, true),
 };
+async function refreshAccessToken(): Promise<boolean> {
+  try {
+    const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;
+    if (!refreshToken) return false;
+    const res = await authApi.refreshToken({ refresh: refreshToken });
+    if (!res.success || !res.data) return false;
+    const payload: any = res.data;
+    if (payload.access) localStorage.setItem('access_token', payload.access);
+    if (payload.refresh) localStorage.setItem('refresh_token', payload.refresh);
+    console.log('Access token refreshed');
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
